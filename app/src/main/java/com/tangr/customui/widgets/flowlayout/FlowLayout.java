@@ -1,24 +1,181 @@
 package com.tangr.customui.widgets.flowlayout;
 
 import android.content.Context;
+import android.graphics.Color;
 import android.util.AttributeSet;
+import android.util.Log;
+import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+
+import com.tangr.customui.R;
+
+import java.util.ArrayList;
+import java.util.Collections;
+import java.util.List;
 
 /**
  * Created by tangr on 2016/6/16.
  */
-public class FlowLayout extends ViewGroup{
+public class FlowLayout extends ViewGroup implements View.OnClickListener, TagAdapter.OnDataChangedListener {
+    public final static int MODE_SINGLE = 1;
+    public final static int MODE_MULTI = 2;
+    private final static int tag_prefix = 100;
+    private TagAdapter adapter;
+    private int mode = MODE_MULTI;
+    private int max = -1;
+    private List<Integer> mTags;
+    private int curCount = 0;
+    private int curIndex = -1;
+
     public FlowLayout(Context context) {
         super(context);
+        initView();
     }
 
     public FlowLayout(Context context, AttributeSet attrs) {
         super(context, attrs);
+        initView();
     }
 
     public FlowLayout(Context context, AttributeSet attrs, int defStyleAttr) {
         super(context, attrs, defStyleAttr);
+        initView();
+    }
+
+    private void initView() {
+    }
+
+    @Override
+    public void onClick(View v) {
+        int click = (int) v.getTag() - tag_prefix;
+        if(mode == MODE_SINGLE){
+            if(click==curIndex){
+                unselect();
+                curIndex = -1;
+            }else {
+                unselect();
+                curIndex = click;
+                select();
+            }
+        }else {
+            curIndex = click;
+            if(mTags.contains(new Integer(click))){
+                unselect();
+            }else {
+                select();
+            }
+        }
+    }
+
+    private void unselect() {
+        if(mode == MODE_SINGLE){
+            if(curIndex>-1){
+                ((TagView)getChildAt(curIndex)).setChecked(false);
+            }
+        }else {
+            if(curCount>0){
+                curCount--;
+                mTags.remove(new Integer(curIndex));
+                ((TagView)getChildAt(curIndex)).setChecked(false);
+            }
+        }
+    }
+
+    private void select() {
+        if(mode == MODE_SINGLE){
+            ((TagView)getChildAt(curIndex)).setChecked(true);
+            if (listener!=null)
+                listener.onSelect(curIndex);
+        }else {
+            if (curCount<max){
+                curCount++;
+                mTags.add(new Integer(curIndex));
+                ((TagView)getChildAt(curIndex)).setChecked(true);
+                if (listener!=null)
+                    listener.onSelect(curIndex);
+            }else {
+                if (listener!=null)
+                    listener.onSelectFull(max);
+            }
+        }
+    }
+
+    private OnTagViewClickListener listener;
+
+    public void setOnSelectListener(OnTagViewClickListener listener){
+        this.listener = listener;
+    }
+
+    private void initCallback() {
+        for (int i=0;i<getChildCount();i++){
+            View child = getChildAt(i);
+            child.setTag(tag_prefix+i);
+            child.setOnClickListener(this);
+        }
+    }
+
+    public void setAdapter(TagAdapter adapter){
+        mTags = new ArrayList<Integer>();
+        this.adapter = adapter;
+        this.adapter.setOnDataChangedListener(this);
+        changeView();
+    }
+
+    @Override
+    public void onChanged() {
+        changeView();
+    }
+
+    private void changeView() {
+        removeAllViews();
+        TagView tagView = null;
+//        float density = getContext().getResources().getDisplayMetrics().density;
+//        MarginLayoutParams lp = new MarginLayoutParams(LayoutParams.WRAP_CONTENT,LayoutParams.WRAP_CONTENT);
+//        int margin = (int) (4*density);
+//        lp.setMargins(margin,margin,margin,margin);
+        for (int i=0;i<adapter.getCount();i++){
+            tagView = (TagView) LayoutInflater.from(getContext()).inflate(R.layout.item_tag,this,false);
+//            tagView = new TagView(getContext());
+//            tagView.setBackgroundResource(R.drawable.item_flow_selector);
+            tagView.setText(adapter.getItem(i));
+//            tagView.setTextColor(Color.BLACK);
+//            tagView.setClickable(true);
+            addView(tagView);
+        }
+        initCallback();
+    }
+
+    public void setMode(int mode,int max) {
+        if(mode==MODE_SINGLE){
+            this.mode = mode;
+            this.max = 1;
+        }else {
+            this.mode = MODE_MULTI;
+            this.max = max >= -1 ? max : -1;
+        }
+    }
+
+    public void setMode(int mode){
+        if(mode==MODE_SINGLE){
+            this.mode = mode;
+            max = 1;
+        }
+        else {
+            this.mode = MODE_MULTI;
+            max = -1;
+        }
+    }
+
+    public List<Integer> getSelected(){
+        if(mode==MODE_SINGLE){
+            List<Integer> list = new ArrayList<Integer>();
+            list.add(curIndex);
+            return list;
+        }else {
+            Collections.sort(mTags);
+            return mTags;
+        }
     }
 
     @Override
